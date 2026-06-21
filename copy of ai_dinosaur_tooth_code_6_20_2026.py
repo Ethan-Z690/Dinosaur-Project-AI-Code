@@ -131,7 +131,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 fossil_images = list(uploaded.keys())
-
+def test_example():
+    assert True
 class FossilDataset(torch.utils.data.Dataset):
     def __init__(self, files):
         self.files = files
