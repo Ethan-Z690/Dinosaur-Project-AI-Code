@@ -123,7 +123,13 @@ plt.imshow(preds[i][0].cpu(), cmap='gray')
 
 plt.show()
 from PIL import Image
-
+from google.colab import files
+uploaded = files.upload()
+import os
+from PIL import Image
+import torch
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
 fossil_images = list(uploaded.keys())
 
 class FossilDataset(torch.utils.data.Dataset):
@@ -147,13 +153,7 @@ dataset = FossilDataset(fossil_images)
 loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 
-from google.colab import files
-uploaded = files.upload()
-import os
-from PIL import Image
-import torch
-from torch.utils.data import Dataset, DataLoader
-import numpy as np
+
 
 class ToothDataset(Dataset):
     def __init__(self, file_dict):
