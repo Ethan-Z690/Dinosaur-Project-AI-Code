@@ -9,6 +9,7 @@ Original file is located at
 # this is a test
 import subprocess
 subprocess.run(["pip", "install", "-q", "torch", "torchvision", "scikit-learn", "matplotlib", "seaborn", "pydicom"])
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
