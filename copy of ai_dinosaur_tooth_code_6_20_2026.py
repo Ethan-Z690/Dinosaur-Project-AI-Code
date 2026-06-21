@@ -7,7 +7,8 @@ Original file is located at
     https://colab.research.google.com/drive/1clk9m3YzZ6ZqmsLJg9AiEYtEk3ItYjeK
 """
 # this is a test
-!pip install -q monai nibabel matplotlib tqdm
+import subprocess
+subprocess.run(["pip", "install", "-q", "monai", "nibabel", "matplotlib", "tqdm"])
 import os
 import numpy as np
 import matplotlib.pyplot as plt
