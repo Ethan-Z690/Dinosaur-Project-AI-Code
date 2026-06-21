@@ -146,7 +146,7 @@ class FossilDataset(torch.utils.data.Dataset):
 dataset = FossilDataset(fossil_images)
 loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
-!pip install -q torch torchvision scikit-learn matplotlib seaborn pydicom
+
 from google.colab import files
 uploaded = files.upload()
 import os
