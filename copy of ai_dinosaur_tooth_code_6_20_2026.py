@@ -359,3 +359,70 @@ def classify_uploaded_teeth(uploaded_files: dict, trained_model: "ToothCNN") -> 
 # or for a single file:
 #   result = predict_tooth("my_tooth.jpg", model)
 #   print(result)
+
+
+def display_teeth_by_category(uploaded_files: dict, trained_model: "ToothCNN") -> None:
+    """
+    Classify every uploaded tooth image and display them grouped by category
+    (Carnivore, Herbivore, Unknown, Uncertain), with each group on its own row.
+    """
+    # Run predictions and bucket images by label
+    buckets = {"Carnivore": [], "Herbivore": [], "Unknown": [], "Uncertain": []}
+    for fname in uploaded_files.keys():
+        result = predict_tooth(fname, trained_model)
+        buckets[result["label"]].append((fname, result["confidence"]))
+
+    # Print a text summary first
+    print("\n── Tooth Classification Results ──")
+    for category, items in buckets.items():
+        if items:
+            print(f"\n{category} ({len(items)} image{'s' if len(items) != 1 else ''}):")
+            for fname, conf in items:
+                print(f"   {fname}  ({conf:.1%} confidence)")
+
+    # Build one row per non-empty category
+    active = [(cat, items) for cat, items in buckets.items() if items]
+    if not active:
+        print("No images to display.")
+        return
+
+    category_colors = {
+        "Carnivore": "red",
+        "Herbivore": "green",
+        "Unknown":   "gray",
+        "Uncertain": "orange",
+    }
+
+    max_cols = max(len(items) for _, items in active)
+    n_rows = len(active)
+
+    fig, axes = plt.subplots(
+        n_rows, max_cols,
+        figsize=(3 * max_cols, 3.5 * n_rows),
+        squeeze=False
+    )
+
+    for row, (category, items) in enumerate(active):
+        color = category_colors[category]
+        for col in range(max_cols):
+            ax = axes[row][col]
+            if col < len(items):
+                fname, conf = items[col]
+                img = Image.open(fname).convert("L").resize((128, 128))
+                ax.imshow(img, cmap="gray")
+                ax.set_title(f"{conf:.1%}", fontsize=8, color=color)
+                ax.set_xlabel(fname, fontsize=6, color="dimgray")
+            ax.axis("off")
+
+        # Category label on the left of each row
+        axes[row][0].set_ylabel(category, fontsize=12, fontweight="bold",
+                                color=color, rotation=0, labelpad=60, va="center")
+        axes[row][0].yaxis.set_label_coords(-0.35, 0.5)
+
+    fig.suptitle("Dinosaur Teeth by Category", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    plt.show()
+
+
+# Call this after training to see all images grouped by category:
+#   display_teeth_by_category(uploaded, model)
