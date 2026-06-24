@@ -273,3 +273,86 @@ import pydicom
 from PIL import Image
 import numpy as np
 
+# ── Carnivore / Herbivore classifier ─────────────────────────────────────────
+
+TOOTH_LABELS = {0: "Carnivore", 1: "Herbivore"}
+
+def predict_tooth(image_path: str, trained_model: "ToothCNN", threshold: float = 0.5) -> dict:
+    """
+    Classify a single tooth image as carnivore or herbivore.
+
+    Args:
+        image_path:    Path to the tooth image (JPEG, PNG, DICOM, etc.).
+        trained_model: A ToothCNN instance that has already been trained.
+        threshold:     Minimum softmax confidence to accept the prediction.
+                       Below this the result is reported as "Uncertain".
+
+    Returns:
+        dict with keys: 'label' (str), 'confidence' (float 0-1), 'raw_scores' (list).
+    """
+    trained_model.eval()
+
+    # Load image — handle DICOM separately
+    if image_path.lower().endswith(".dcm"):
+        dcm = pydicom.dcmread(image_path)
+        pixel_array = dcm.pixel_array.astype(np.float32)
+        pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min() + 1e-8)
+        img_pil = Image.fromarray((pixel_array * 255).astype(np.uint8)).convert("L")
+    else:
+        img_pil = Image.open(image_path).convert("L")
+
+    img_pil = img_pil.resize((128, 128))
+    img_np = np.array(img_pil) / 255.0
+    img_tensor = torch.tensor(img_np).unsqueeze(0).unsqueeze(0).float()  # (1,1,128,128)
+
+    with torch.no_grad():
+        logits = trained_model(img_tensor)
+        probs = torch.softmax(logits, dim=1)[0]
+
+    confidence, predicted_idx = probs.max(0)
+    confidence = confidence.item()
+    predicted_idx = predicted_idx.item()
+
+    label = TOOTH_LABELS[predicted_idx] if confidence >= threshold else "Uncertain"
+
+    return {
+        "label": label,
+        "confidence": confidence,
+        "raw_scores": probs.tolist(),
+    }
+
+
+def classify_uploaded_teeth(uploaded_files: dict, trained_model: "ToothCNN") -> None:
+    """
+    Run predict_tooth on every file in the Colab `uploaded` dict and
+    print + visualise the results.
+    """
+    results = []
+    for fname in uploaded_files.keys():
+        result = predict_tooth(fname, trained_model)
+        results.append((fname, result))
+        print(f"{fname}  →  {result['label']}  (confidence: {result['confidence']:.1%})")
+
+    # Visualise up to 6 images with their predictions
+    n = min(6, len(results))
+    if n == 0:
+        return
+
+    plt.figure(figsize=(3 * n, 3))
+    for i, (fname, result) in enumerate(results[:n]):
+        img = Image.open(fname).convert("L").resize((128, 128))
+        plt.subplot(1, n, i + 1)
+        plt.imshow(img, cmap="gray")
+        color = "green" if result["label"] == "Herbivore" else ("red" if result["label"] == "Carnivore" else "orange")
+        plt.title(f"{result['label']}\n{result['confidence']:.1%}", color=color, fontsize=9)
+        plt.axis("off")
+    plt.suptitle("Tooth Classification: Carnivore vs Herbivore")
+    plt.tight_layout()
+    plt.show()
+
+
+# After training completes, call:
+#   classify_uploaded_teeth(uploaded, model)
+# or for a single file:
+#   result = predict_tooth("my_tooth.jpg", model)
+#   print(result)
