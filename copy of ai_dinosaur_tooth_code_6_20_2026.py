@@ -158,9 +158,9 @@ class ToothDataset(Dataset):
         self.samples = []
 
         for fname in file_dict.keys():
-            if "carnivore" in fname:
+            if "carnivore" in fname or "theropod" in fname or "UA_9944" in fname:
                 label = 0
-            elif "herbivore" in fname:
+            elif "herbivore" in fname or "ornithopod" in fname:
                 label = 1
             else:
                 continue
@@ -201,7 +201,7 @@ class ToothCNN(nn.Module):
             nn.Flatten(),
             nn.Linear(32*32*32,64),
             nn.ReLU(),
-            nn.Linear(64,2)
+            nn.Linear(64,3) # Changed from 2 to 3 to accommodate the new class
         )
 
     def forward(self,x):
@@ -269,17 +269,19 @@ for i in range(min(6, imgs.shape[0])):
 
 plt.tight_layout()
 plt.show()
+# predict_tooth(image_path, trained_model, threshold=0.5)
+
 import pydicom
 from PIL import Image
 import numpy as np
 
-# ── Carnivore / Herbivore classifier ─────────────────────────────────────────
+# ── Carnivore / Herbivore / Unknown classifier ────────────────────────────────
 
-TOOTH_LABELS = {0: "Carnivore", 1: "Herbivore"}
+TOOTH_LABELS = {0: "Carnivore", 1: "Herbivore", 2: "Unknown"}
 
 def predict_tooth(image_path: str, trained_model: "ToothCNN", threshold: float = 0.5) -> dict:
     """
-    Classify a single tooth image as carnivore or herbivore.
+    Classify a single tooth image as Carnivore, Herbivore, or Unknown.
 
     Args:
         image_path:    Path to the tooth image (JPEG, PNG, DICOM, etc.).
@@ -313,7 +315,7 @@ def predict_tooth(image_path: str, trained_model: "ToothCNN", threshold: float =
     confidence = confidence.item()
     predicted_idx = predicted_idx.item()
 
-    label = TOOTH_LABELS[predicted_idx] if confidence >= threshold else "Uncertain"
+    label = TOOTH_LABELS.get(predicted_idx, "Unknown") if confidence >= threshold else "Uncertain"
 
     return {
         "label": label,
@@ -338,15 +340,16 @@ def classify_uploaded_teeth(uploaded_files: dict, trained_model: "ToothCNN") -> 
     if n == 0:
         return
 
+    label_colors = {"Herbivore": "green", "Carnivore": "red", "Unknown": "gray"}
     plt.figure(figsize=(3 * n, 3))
     for i, (fname, result) in enumerate(results[:n]):
         img = Image.open(fname).convert("L").resize((128, 128))
         plt.subplot(1, n, i + 1)
         plt.imshow(img, cmap="gray")
-        color = "green" if result["label"] == "Herbivore" else ("red" if result["label"] == "Carnivore" else "orange")
+        color = label_colors.get(result["label"], "orange")
         plt.title(f"{result['label']}\n{result['confidence']:.1%}", color=color, fontsize=9)
         plt.axis("off")
-    plt.suptitle("Tooth Classification: Carnivore vs Herbivore")
+    plt.suptitle("Tooth Classification: Carnivore vs Herbivore vs Unknown")
     plt.tight_layout()
     plt.show()
 
