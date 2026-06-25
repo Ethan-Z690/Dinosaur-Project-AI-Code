@@ -163,7 +163,7 @@ class ToothDataset(Dataset):
             elif "herbivore" in fname or "ornithopod" in fname:
                 label = 1
             else:
-                continue
+                label = 2  # Unknown — accept any filename
 
             self.samples.append((fname, label))
 
