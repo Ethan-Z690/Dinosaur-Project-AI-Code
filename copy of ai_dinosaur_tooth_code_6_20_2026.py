@@ -158,7 +158,9 @@ class ToothDataset(Dataset):
         self.samples = []
 
         for fname in file_dict.keys():
-            self.samples.append((fname, 2))  # label assigned by model prediction, not filename
+            # Label is a placeholder — actual classification is done by predict_tooth_clip()
+            # or predict_tooth() after the model is trained on labeled data.
+            self.samples.append((fname, 2))
 
     def __len__(self):
         return len(self.samples)
@@ -201,6 +203,10 @@ class ToothCNN(nn.Module):
         return self.net(x)
 
 model = ToothCNN()
+
+# NOTE: The CNN training below requires labeled images to be useful.
+# If you have no labeled data, skip this block and use
+# display_teeth_by_category_clip(uploaded) instead — it needs no training.
 import torch.optim as optim
 
 criterion = nn.CrossEntropyLoss()
@@ -274,8 +280,8 @@ import numpy as np
 import clip
 
 CLIP_LABELS = [
-    "a carnivore dinosaur tooth, sharp and pointed",
-    "an herbivore dinosaur tooth, flat and broad",
+    "a sharp pointed serrated carnivore predator dinosaur tooth fossil",
+    "a flat blunt wide herbivore plant-eating dinosaur tooth fossil",
 ]
 CLIP_LABEL_NAMES = ["Carnivore", "Herbivore"]
 
@@ -287,7 +293,7 @@ def _load_clip():
     if _clip_model is None:
         _clip_model, _clip_preprocess = clip.load("ViT-B/32", device=device)
 
-def predict_tooth_clip(image_path: str, threshold: float = 0.6) -> dict:
+def predict_tooth_clip(image_path: str, threshold: float = 0.5) -> dict:
     """
     Classify a single tooth image using CLIP zero-shot inference.
     No training required — classification is driven by text descriptions.
