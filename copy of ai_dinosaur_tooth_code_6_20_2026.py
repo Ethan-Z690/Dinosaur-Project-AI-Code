@@ -158,14 +158,7 @@ class ToothDataset(Dataset):
         self.samples = []
 
         for fname in file_dict.keys():
-            if "carnivore" in fname or "theropod" in fname or "UA_9944" in fname:
-                label = 0
-            elif "herbivore" in fname or "ornithopod" in fname:
-                label = 1
-            else:
-                label = 2  # Unknown — accept any filename
-
-            self.samples.append((fname, label))
+            self.samples.append((fname, 2))  # label assigned by model prediction, not filename
 
     def __len__(self):
         return len(self.samples)
