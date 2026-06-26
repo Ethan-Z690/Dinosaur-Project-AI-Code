@@ -268,7 +268,120 @@ import pydicom
 from PIL import Image
 import numpy as np
 
-# ── Carnivore / Herbivore / Unknown classifier ────────────────────────────────
+# ── CLIP zero-shot classifier (no training required) ─────────────────────────
+
+!pip install -q git+https://github.com/openai/CLIP.git
+import clip
+
+CLIP_LABELS = [
+    "a carnivore dinosaur tooth, sharp and pointed",
+    "an herbivore dinosaur tooth, flat and broad",
+]
+CLIP_LABEL_NAMES = ["Carnivore", "Herbivore"]
+
+_clip_model = None
+_clip_preprocess = None
+
+def _load_clip():
+    global _clip_model, _clip_preprocess
+    if _clip_model is None:
+        _clip_model, _clip_preprocess = clip.load("ViT-B/32", device=device)
+
+def predict_tooth_clip(image_path: str, threshold: float = 0.6) -> dict:
+    """
+    Classify a single tooth image using CLIP zero-shot inference.
+    No training required — classification is driven by text descriptions.
+
+    Args:
+        image_path: Path to the tooth image (JPEG, PNG, DICOM, etc.).
+        threshold:  Minimum softmax confidence to accept the prediction.
+                    Below this the result is reported as "Uncertain".
+
+    Returns:
+        dict with keys: 'label' (str), 'confidence' (float 0-1), 'raw_scores' (list).
+    """
+    _load_clip()
+
+    # Load image — handle DICOM separately
+    if image_path.lower().endswith(".dcm"):
+        dcm = pydicom.dcmread(image_path)
+        pixel_array = dcm.pixel_array.astype(np.float32)
+        pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min() + 1e-8)
+        img_pil = Image.fromarray((pixel_array * 255).astype(np.uint8)).convert("RGB")
+    else:
+        img_pil = Image.open(image_path).convert("RGB")
+
+    image_tensor = _clip_preprocess(img_pil).unsqueeze(0).to(device)
+    text_tokens = clip.tokenize(CLIP_LABELS).to(device)
+
+    with torch.no_grad():
+        logits_per_image, _ = _clip_model(image_tensor, text_tokens)
+        probs = logits_per_image.softmax(dim=-1).cpu()[0]
+
+    confidence, predicted_idx = probs.max(0)
+    confidence = confidence.item()
+    predicted_idx = predicted_idx.item()
+
+    label = CLIP_LABEL_NAMES[predicted_idx] if confidence >= threshold else "Uncertain"
+
+    return {
+        "label": label,
+        "confidence": confidence,
+        "raw_scores": probs.tolist(),
+    }
+
+
+def display_teeth_by_category_clip(uploaded_files: dict) -> None:
+    """
+    Classify every uploaded image with CLIP (no trained model needed) and
+    display them grouped by category, one row per category.
+    """
+    buckets = {"Carnivore": [], "Herbivore": [], "Uncertain": []}
+    for fname in uploaded_files.keys():
+        result = predict_tooth_clip(fname)
+        buckets[result["label"]].append((fname, result["confidence"]))
+
+    print("\n── CLIP Tooth Classification Results ──")
+    for category, items in buckets.items():
+        if items:
+            print(f"\n{category} ({len(items)} image{'s' if len(items) != 1 else ''}):")
+            for fname, conf in items:
+                print(f"   {fname}  ({conf:.1%} confidence)")
+
+    active = [(cat, items) for cat, items in buckets.items() if items]
+    if not active:
+        print("No images to display.")
+        return
+
+    category_colors = {"Carnivore": "red", "Herbivore": "green", "Uncertain": "orange"}
+    max_cols = max(len(items) for _, items in active)
+    n_rows = len(active)
+
+    fig, axes = plt.subplots(n_rows, max_cols,
+                             figsize=(3 * max_cols, 3.5 * n_rows),
+                             squeeze=False)
+
+    for row, (category, items) in enumerate(active):
+        color = category_colors[category]
+        for col in range(max_cols):
+            ax = axes[row][col]
+            if col < len(items):
+                fname, conf = items[col]
+                img = Image.open(fname).convert("L").resize((128, 128))
+                ax.imshow(img, cmap="gray")
+                ax.set_title(f"{conf:.1%}", fontsize=8, color=color)
+                ax.set_xlabel(fname, fontsize=6, color="dimgray")
+            ax.axis("off")
+        axes[row][0].set_ylabel(category, fontsize=12, fontweight="bold",
+                                color=color, rotation=0, labelpad=60, va="center")
+        axes[row][0].yaxis.set_label_coords(-0.35, 0.5)
+
+    fig.suptitle("Dinosaur Teeth by Category (CLIP)", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    plt.show()
+
+
+# ── Trained-model classifier ──────────────────────────────────────────────────
 
 TOOTH_LABELS = {0: "Carnivore", 1: "Herbivore", 2: "Unknown"}
 
